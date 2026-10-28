@@ -1,7 +1,7 @@
 package cn.chsi.sandbox.archive;
 
-import org.jasig.cas.client.session.SingleSignOutFilter;
-import org.jasig.cas.client.validation.Cas30ServiceTicketValidator;
+import org.apereo.cas.client.session.SingleSignOutFilter;
+import org.apereo.cas.client.validation.Cas30ServiceTicketValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -60,10 +60,13 @@ public class CasSecurityConfig {
     }
 
     @Bean
-    public CasAuthenticationFilter casFilter(ServiceProperties sp) {
+    public CasAuthenticationFilter casFilter(ServiceProperties sp,
+                                             CasAuthenticationProvider provider) {
         CasAuthenticationFilter f = new CasAuthenticationFilter();
         f.setServiceProperties(sp);
         f.setFilterProcessesUrl("/archive/j_spring_cas_security_check");
+        // 必须显式给一个 AuthenticationManager，否则 afterPropertiesSet 报错
+        f.setAuthenticationManager(a -> provider.authenticate(a));
         return f;
     }
 

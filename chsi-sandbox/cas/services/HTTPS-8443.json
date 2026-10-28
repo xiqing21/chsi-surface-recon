@@ -1,9 +1,0 @@
-{
-  "@class": "org.apereo.cas.services.RegexRegisteredService",
-  "serviceId": "^https://([a-z0-9-]+\\.)*chsi\\.com\\.cn(:\\d+)?(/.*)?$",
-  "name": "chsi-sandbox-subsystems",
-  "id": 1000,
-  "description": "复刻线上白名单形态：允许 *.chsi.com.cn",
-  "evaluationOrder": 10,
-  "logoutType": "BACK_CHANNEL"
-}

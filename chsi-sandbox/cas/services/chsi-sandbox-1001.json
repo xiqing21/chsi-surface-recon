@@ -1,6 +1,6 @@
 {
-  "@class": "org.apereo.cas.services.RegexRegisteredService",
-  "serviceId": "^https?://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/.*)?$",
+  "@class": "org.apereo.cas.services.CasRegisteredService",
+  "serviceId": "^(https?)://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/.*)?$",
   "name": "sandbox-local",
   "id": 1001,
   "description": "本地组件回跳",

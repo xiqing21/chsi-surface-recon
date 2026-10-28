@@ -1,0 +1,13 @@
+SERVICE                                                        STATUS   LOCATION
+https://portal.chsi.com.cn/archive/j_spring_cas_security_check 200      
+https://portal.chsi.com.cn@evil.example/                       403      
+https://portal.chsi.com.cn.evil.example/                       403      
+https://portal.chsi.com.cn/../..//evil.example/                200      
+https://portal.chsi.com.cn%2F@evil.example/                    403      
+https://portal.chsi.com.cn%00.evil.example/                    403      
+HTTPS://PORTAL.CHSI.COM.CN/                                    200      
+https://evil.example/?x=.chsi.com.cn                           403      
+https://evil.example#.chsi.com.cn                              403      
+https://portal.chsi.com.cn\@evil.example/                      403      
+https://portal.chsi.com.cn;jsessionid=ATTACKER_SID             200      
+//evil.example/                                                403      
