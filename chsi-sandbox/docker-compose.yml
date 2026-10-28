@@ -1,0 +1,57 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: chsi-db
+    environment:
+      MYSQL_ROOT_PASSWORD: sandbox
+      MYSQL_DATABASE: chsi
+    ports: ["3306:3306"]
+    volumes:
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-psandbox"]
+      interval: 5s
+      retries: 20
+
+  cas:
+    image: apereo/cas:7.3.8.3
+    container_name: chsi-cas
+    ports: ["8443:8443", "8080:8080"]
+    volumes:
+      - ./cas/services:/etc/cas/services:ro
+    environment:
+      CAS_SERVER_NAME: https://localhost:8443
+      CAS_SERVICE_REGISTRY_CORE_JSON_LOCATION: file:/etc/cas/services
+
+  portal:
+    build: ./portal
+    container_name: chsi-portal
+    ports: ["8090:8080"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/chsi?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: sandbox
+      SANDBOX_CAPTCHA_MODE: session_latest
+    depends_on:
+      db:
+        condition: service_healthy
+
+  archive:
+    build: ./archive
+    container_name: chsi-archive
+    ports: ["8091:8080"]
+    environment:
+      CAS_SERVER: https://localhost:8443/cas
+      CAS_SERVICE: http://localhost:8091/archive/j_spring_cas_security_check
+    depends_on: [cas]
+
+  xjxl:
+    build: ./xjxl
+    container_name: chsi-xjxl
+    ports: ["8092:8080"]
+    environment:
+      SANDBOX_COOKIE_KEY: c2FuZGJveC1rZXktMzJieXRlcy1sb25nISE=
+    depends_on:
+      db:
+        condition: service_healthy
