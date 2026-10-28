@@ -1,0 +1,100 @@
+{
+  "observed_at": "2026-10-28T04:52Z",
+  "edge": {
+    "waf": "Aliyun WAF (aliyungf_tc, acw_tc cookies)",
+    "lb": "F5 BIG-IP ASM (TS01xxxx cookie, per-subsystem)",
+    "cdn_static": "t1.chei.com.cn"
+  },
+  "app_layer": {
+    "framework": "Java Servlet / Spring MVC (.action .do .mvc handlers, JSESSIONID)",
+    "auth": "CAS SSO - Spring Security CAS client (j_spring_cas_security_check)",
+    "session_cookies": [
+      "CHSICC01",
+      "CHSICC02",
+      "CHSICC_CLIENTFLAGCHSI",
+      "CHSICC_CLIENTFLAGMY",
+      "CHSICC_CLIENTFLAGXJXL2",
+      "CHSICC_CLIENTFLAGJOB",
+      "XSRF-CCKTOKEN"
+    ]
+  },
+  "frontend": {
+    "chsi_www": "Vue 2.6.10 + iView 4.6.1 + jQuery 1.9.1",
+    "pattern": "server-injected config into Vue mixin, pseudo-static .htm/.jsp"
+  },
+  "domains": {
+    "www": "portal + zero-scatter query",
+    "my": "archive (CAS protected)",
+    "account": "passport / CAS server",
+    "xjxl": "学籍学历管理平台 (htgl/index.mvc)",
+    "job": "employment portal",
+    "rz": "report verification (403/503 from edge)",
+    "dy": "研招 (edge blocked)"
+  },
+  "internal_csp_hosts": [
+    "chei.com.cn",
+    "chdi.com.cn",
+    "ncss.cn",
+    "ncss.org.cn",
+    "qtedu.om.moe.edu.cn",
+    "chsi-v.oss-cn-beijing.aliyuncs.com"
+  ],
+  "business_flow": [
+    {
+      "step": 1,
+      "name": "注册/实名",
+      "where": "account.chsi.com.cn/passport",
+      "control": "姓名+身份证+手机号 三要素核验(调公安部人口库)"
+    },
+    {
+      "step": 2,
+      "name": "登录",
+      "where": "CAS SSO",
+      "control": "票据 service ticket 回跳子系统"
+    },
+    {
+      "step": 3,
+      "name": "绑定学籍",
+      "where": "my.chsi.com.cn/archive",
+      "control": "需与中央库上报记录匹配"
+    },
+    {
+      "step": 4,
+      "name": "零散查询",
+      "where": "www/xlcx/lscx/query.do -> queryinfo.do",
+      "control": "证书编号zsbh + 姓名xm + 图片验证码yzm + rdmid"
+    },
+    {
+      "step": 5,
+      "name": "在线验证报告",
+      "where": "rz.chsi.com.cn",
+      "control": "16位验证码 + 报告编号"
+    },
+    {
+      "step": 6,
+      "name": "数据来源",
+      "where": "高校/省厅上报",
+      "control": "审核制，只读上报，非实时"
+    }
+  ],
+  "query_endpoint": {
+    "form": "https://www.chsi.com.cn/xlcx/lscx/query.do",
+    "submit": "POST queryinfo.do",
+    "fields": [
+      "rdmid (server-injected random, NOT session-bound at page render)",
+      "state=CHSI",
+      "zsbh 证书编号",
+      "xm 姓名",
+      "yzm 验证码",
+      "yhxy 协议勾选"
+    ],
+    "captcha": "imagechallenge.do?time=<ts>&rdmid=<id>",
+    "note": "姓名+身份证 不能直接查；必须 证书编号+姓名"
+  },
+  "component_era": {
+    "jquery": "1.9.1 (2013)",
+    "vue": "2.6.10 (2020, EOL)",
+    "iview": "4.6.1 (2020)",
+    "note": "frontend deps are old but not directly exploitable without an XSS sink"
+  }
+}
